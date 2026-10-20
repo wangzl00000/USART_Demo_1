@@ -24,7 +24,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "dma_test.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -45,14 +45,7 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-/* 接收缓冲区：max_len + 1，预留 '\0' 位置 */
-static uint8_t rx_buf[UART_RX_BUF_SIZE + 1U];
 
-/* 解析出的数值（a/b/c/d 依次对应 data1/data2/data3/data4） */
-static float data1 = 0.0f;
-static float data2 = 0.0f;
-static float data3 = 0.0f;
-static float data4 = 0.0f;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -98,7 +91,8 @@ int main(void)
   MX_DMA_Init();
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
-
+  /* 启动 USART1 DMA 环形接收（DMA1_Channel5 循环模式 + 空闲中断） */
+  DmaTest_Init();
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -108,45 +102,8 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    uint32_t cycle_start;
-    uint32_t elapsed;
-    uint16_t rx_len;
-    uint8_t  num;
-    float    values[UART_DATA_MAX_NUM] = {0.0f};
-
-    cycle_start = HAL_GetTick();
-
-    /* ---------- 前 0.5s：阻塞式接收一帧，格式 "a=22.33 b=34.55 c=44.55" ---------- */
-    rx_len = Uart_ReceiveFrame(rx_buf, UART_RX_BUF_SIZE, UART_RX_WINDOW_MS, UART_RX_GAP_MS);
-
-    /* 补齐前 0.5s 接收窗口 */
-    do
-    {
-      elapsed = HAL_GetTick() - cycle_start;
-    } while (elapsed < UART_RX_WINDOW_MS);
-
-    if (rx_len > 0U)
-    {
-      /* ---------- 解析 a/b/c/d 等变量，结果以 float 保存 ---------- */
-      num = Uart_ParseFrame((const char *)rx_buf, values, UART_DATA_MAX_NUM);
-
-      data1 = values[0];
-      data2 = values[1];
-      data3 = values[2];
-      data4 = values[3];
-
-      /* ---------- 后 0.5s：阻塞式发送，保留两位小数 ---------- */
-      if (num > 0U)
-      {
-        (void)Uart_SendValues(values, num);
-      }
-    }
-
-    /* ---------- 保持 1s 周期 ---------- */
-    do
-    {
-      elapsed = HAL_GetTick() - cycle_start;
-    } while (elapsed < UART_CYCLE_MS);
+    /* 轮询处理已接收完成的整帧：LED 命令解析 + 原样回发 */
+    DmaTest_Poll();
   }
   /* USER CODE END 3 */
 }
